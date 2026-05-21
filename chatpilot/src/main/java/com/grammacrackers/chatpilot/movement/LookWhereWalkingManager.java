@@ -24,14 +24,15 @@ public class LookWhereWalkingManager {
         // Do not fight other systems that intentionally control the camera.
         if (mc.currentScreen != null) return;
         if (ChatPilotClient.COMBAT != null && ChatPilotClient.COMBAT.isInCombat()) return;
-        if (ChatPilotClient.BARITONE != null && ChatPilotClient.BARITONE.isMining()) return;
         if (p.isUsingItem()) return;
-        if (p.handSwinging) return;
 
+        // Only face movement direction while Baritone is actively traversing path
+        // segments. When isPathing() is false (standing still to mine a block,
+        // waiting, idle), Baritone aims at its target block and we stay out of the
+        // way. This keeps the camera smooth during travel and correct during mining.
         boolean baritoneWalking =
                 ChatPilotClient.BARITONE != null
-                        && ChatPilotClient.BARITONE.isActive()
-                        && !ChatPilotClient.BARITONE.isMining();
+                        && ChatPilotClient.BARITONE.isPathing();
 
         if (!baritoneWalking) {
             lastPos = p.getPos();
