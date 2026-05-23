@@ -251,9 +251,20 @@ public class ChatPilotConfig {
                 String json = Files.readString(file);
                 ChatPilotConfig cfg = gson.fromJson(json, ChatPilotConfig.class);
                 if (cfg != null) {
+                    ChatPilotConfig defaults = new ChatPilotConfig();
                     if (cfg.trashItemIds == null || cfg.trashItemIds.isEmpty()) {
-                        cfg.trashItemIds = new ChatPilotConfig().trashItemIds;
+                        cfg.trashItemIds = defaults.trashItemIds;
                     }
+                    // Fields added in later versions will deserialize as 0/false.
+                    // Patch them back to their intended defaults so an old config
+                    // file does not silently break new features.
+                    if (cfg.botWalkSpeed <= 0.0) cfg.botWalkSpeed = defaults.botWalkSpeed;
+                    if (cfg.lookWhereWalkingMaxYawPerTick <= 0.0)
+                        cfg.lookWhereWalkingMaxYawPerTick = defaults.lookWhereWalkingMaxYawPerTick;
+                    if (cfg.lookWhereWalkingMaxPitchPerTick <= 0.0)
+                        cfg.lookWhereWalkingMaxPitchPerTick = defaults.lookWhereWalkingMaxPitchPerTick;
+                    if (cfg.lookWhereWalkingMinSpeed <= 0.0)
+                        cfg.lookWhereWalkingMinSpeed = defaults.lookWhereWalkingMinSpeed;
                     Files.writeString(file, gson.toJson(cfg));
                     return cfg;
                 }
