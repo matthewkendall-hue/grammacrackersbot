@@ -5,6 +5,7 @@ import baritone.api.IBaritone;
 import baritone.api.Settings;
 import baritone.api.pathing.goals.GoalNear;
 import baritone.api.pathing.goals.GoalXZ;
+import com.grammacrackers.chatpilot.ChatPilotClient;
 import com.grammacrackers.chatpilot.ChatPilotMod;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.math.BlockPos;
@@ -42,7 +43,10 @@ public class BaritoneController {
             s.freeLook.value = true;           // LookWhereWalkingManager owns the camera during movement
             s.allowParkour.value = false;       // safer
             s.allowParkourPlace.value = false;
-            s.allowSprint.value = true;
+            boolean sprint = ChatPilotClient.CONFIG != null && ChatPilotClient.CONFIG.botAllowSprint;
+            s.allowSprint.value = sprint;
+            double speed = ChatPilotClient.CONFIG != null ? ChatPilotClient.CONFIG.botWalkSpeed : 0.8;
+            s.walkSpeed.value = speed;
             s.allowBreak.value = true;
             s.allowPlace.value = true;
             s.legitMine.value = false;          // mine using full info (we own the world)

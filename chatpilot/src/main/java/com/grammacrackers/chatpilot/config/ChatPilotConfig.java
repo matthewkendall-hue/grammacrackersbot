@@ -40,15 +40,21 @@ public class ChatPilotConfig {
     public boolean cancelSuffocationDamage = true;
     public double  lavaDamageMultiplier    = 0.10;
 
+    // === Pathing speed ===
+    /** Set to false to prevent Baritone from sprinting (slower but smoother movement). */
+    public boolean botAllowSprint = true;
+    /** Walk speed multiplier for Baritone (1.0 = normal, 0.8 = slightly slower). */
+    public double  botWalkSpeed   = 0.8;
+
     // === Camera / stream presentation ===
     public boolean lookWhereWalking = true;
-    
+
     /**
      * Visible camera turn speed while Baritone is simply walking.
      * Higher = snappier, lower = smoother.
      */
-    public double lookWhereWalkingMaxYawPerTick = 7.0;
-    public double lookWhereWalkingMaxPitchPerTick = 3.0;
+    public double lookWhereWalkingMaxYawPerTick = 4.0;
+    public double lookWhereWalkingMaxPitchPerTick = 2.5;
     
     /**
      * Slightly downward looks more natural on stream than pitch=0.

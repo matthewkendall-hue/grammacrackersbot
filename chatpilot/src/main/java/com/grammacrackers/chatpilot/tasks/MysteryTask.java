@@ -1,5 +1,6 @@
 package com.grammacrackers.chatpilot.tasks;
 
+import com.grammacrackers.chatpilot.ChatPilotClient;
 import com.grammacrackers.chatpilot.explore.StructureMarker;
 
 /**
