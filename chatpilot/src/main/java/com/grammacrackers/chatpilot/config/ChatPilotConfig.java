@@ -44,7 +44,7 @@ public class ChatPilotConfig {
     /** Set to false to prevent Baritone from sprinting (slower but smoother movement). */
     public boolean botAllowSprint = true;
     /** Walk speed multiplier for Baritone (1.0 = normal, 0.8 = slightly slower). */
-    public double  botWalkSpeed   = 0.8;
+    public double  botWalkSpeed   = 1.0;
 
     // === Camera / stream presentation ===
     public boolean lookWhereWalking = true;
