@@ -105,6 +105,22 @@ public class FishingTask implements Task {
         var mc = MinecraftClient.getInstance();
         if (mc.player == null || mc.world == null) return false;
 
+        // ====================================================================
+        // OCEAN FIX 1: TREAD WATER FOR BUOYANCY
+        // ====================================================================
+        // If the bot is inside water or submerged, forcefully hold the jump key
+        // to float directly up to the surface and stay there.
+        if (mc.player.isTouchingWater() || mc.player.isInSwimmingPose()) {
+            mc.options.jumpKey.setPressed(true);
+        } else {
+            // Re-release standard control handling if we step onto dry land
+            // but only if Baritone isn't trying to use jump for pathing
+            if (!ChatPilotClient.BARITONE.isPathing()) {
+                mc.options.jumpKey.setPressed(false);
+            }
+        }
+        // ====================================================================
+
         switch (stage) {
             case SCAN_WATER       -> tickScanWater(mc);
             case WALK_TO_WATER    -> tickWalkToWater(mc);
@@ -122,11 +138,32 @@ public class FishingTask implements Task {
     /* ---------- per-stage handlers ---------- */
 
     private void tickScanWater(MinecraftClient mc) {
+
+        // ====================================================================
+        // OCEAN FIX 2: SHORT-CIRCUIT FOR OPEN SEA FISHING
+        // ====================================================================
+        var currentFluid = mc.world.getFluidState(mc.player.getBlockPos());
+        if (mc.player.isTouchingWater() && currentFluid.isStill() && (currentFluid.isOf(Fluids.WATER) || currentFluid.isOf(Fluids.FLOWING_WATER))) {
+            // We are already floating in water! Target a block 4 blocks directly ahead of our gaze
+            var lookVec = mc.player.getRotationVec(1.0f);
+            BlockPos forwardWater = mc.player.getBlockPos().add(
+                    (int)(lookVec.x * 4),
+                    0,
+                    (int)(lookVec.z * 4)
+            );
+
+            waterTarget = forwardWater;
+            ChatPilotMod.LOGGER.info("[ChatPilot][Fishing] Deep Ocean detected! Fishing in-place at surface.");
+            enterStage(Stage.EQUIP_ROD); // Skip scanning and walking entirely!
+            return;
+        }
+        // ====================================================================
+
         BlockPos surface = findWaterSurface(mc);
         if (surface != null) {
             waterTarget = surface;
             ChatPilotClient.BARITONE.hardReset();
-            ChatPilotClient.BARITONE.gotoNear(surface, 3);
+            ChatPilotClient.BARITONE.gotoNear(surface, 2);
             ChatPilotMod.LOGGER.info("[ChatPilot][Fishing] Water surface at {}, walking to it", surface);
             enterStage(Stage.WALK_TO_WATER);
             return;
@@ -149,7 +186,11 @@ public class FishingTask implements Task {
     private void tickWalkToWater(MinecraftClient mc) {
         if (waterTarget == null) { enterStage(Stage.SCAN_WATER); return; }
         double dist2 = mc.player.getBlockPos().getSquaredDistance(waterTarget);
-        if (dist2 < ARRIVAL_DIST_SQ) {
+
+        // FIX: Instead of checking ARRIVAL_DIST_SQ (16), we check if it's within 4-6 blocks squared.
+        // This ensures the bot keeps walking until it is tightly positioned by the water.
+        if (dist2 <= 6.0) {
+            ChatPilotClient.BARITONE.stop(); // Stop Baritone immediately
             ChatPilotClient.BARITONE.hardReset();
             enterStage(Stage.EQUIP_ROD);
             return;
@@ -162,7 +203,8 @@ public class FishingTask implements Task {
             return;
         }
         if (!ChatPilotClient.BARITONE.isPathing() && !ChatPilotClient.BARITONE.isActive()) {
-            ChatPilotClient.BARITONE.gotoNear(waterTarget, 3);
+            // FIX: Match the tighter target radius here too
+            ChatPilotClient.BARITONE.gotoNear(waterTarget, 2);
         }
     }
 
@@ -229,22 +271,38 @@ public class FishingTask implements Task {
     }
 
     private void tickReeling(MinecraftClient mc) {
+        // THE GHOST FIX: If the game or server already deleted the bobber entity,
+        // the client pointer is null. Staying here causes a soft-lock loop.
+        if (mc.player.fishHook == null) {
+            ChatPilotMod.LOGGER.warn("[ChatPilot][Fishing] Bobber went missing in REELING! Forcing state reset.");
+
+            // Clear any bad tracking states and cycle completely back to scanning
+            waterTarget = null;
+            enterStage(Stage.SCAN_WATER);
+            return;
+        }
+
+        // Ensure the rod is still our active selection before clicking
         if (mc.player.getInventory().selectedSlot != rodSelectedSlot && rodSelectedSlot >= 0) {
             mc.player.getInventory().setSelectedSlot(rodSelectedSlot);
         }
-        // Right-click again to reel.
-        mc.interactionManager.interactItem(mc.player, Hand.MAIN_HAND);
+
+        // Executing the actual physical reel-in click right here:
+        mc.interactionManager.interactItem(mc.player, net.minecraft.util.Hand.MAIN_HAND);
+
         // Count this only as a catch if a bite was registered before the timeout.
-        // Heuristic: if the wait window was not exhausted, we caught something.
         long elapsed = clientTick() - waitingStartTick;
         if (elapsed < ChatPilotClient.CONFIG.fishingMaxWaitTicks) {
             catches++;
         }
+
         if (catches >= ChatPilotClient.CONFIG.fishingCatchTarget) {
             ChatPilotMod.LOGGER.info("[ChatPilot][Fishing] Catch target met ({}), ending task", catches);
             enterStage(Stage.DONE);
             return;
         }
+
+        // Advance to SETTLE to give the server a quick moment to deliver the item
         enterStage(Stage.SETTLE);
     }
 
@@ -274,27 +332,38 @@ public class FishingTask implements Task {
      * is in range.
      */
     private BlockPos findWaterSurface(MinecraftClient mc) {
-        int radius = Math.max(4, ChatPilotClient.CONFIG.fishingWaterScanRadius);
-        BlockPos here = mc.player.getBlockPos();
-        BlockPos best = null;
-        double bestDist = Double.MAX_VALUE;
-        BlockPos lo = here.add(-radius, -8, -radius);
-        BlockPos hi = here.add( radius,  8,  radius);
-        for (BlockPos p : BlockPos.iterate(lo, hi)) {
-            try {
-                BlockState bs = mc.world.getBlockState(p);
-                if (!bs.getFluidState().isOf(Fluids.WATER)) continue;
-                if (!bs.getFluidState().isStill()) continue;
-                BlockState above = mc.world.getBlockState(p.up());
-                if (!above.isAir()) continue;
-                double d = p.getSquaredDistance(here);
-                if (d < bestDist) {
-                    bestDist = d;
-                    best = p.toImmutable();
+        BlockPos playerPos = mc.player.getBlockPos();
+        int r = 16; // Search radius
+
+        BlockPos closestWater = null;
+        double closestDistSq = Double.MAX_VALUE;
+
+        for (int y = r; y >= -r; y--) {
+            for (int x = -r; x <= r; x++) {
+                for (int z = -r; z <= r; z++) {
+                    BlockPos p = playerPos.add(x, y, z);
+
+                    // 1. Check if the block is a still fluid AND is actually water (ignores lava)
+                    var fluidState = mc.world.getFluidState(p);
+                    if (fluidState.isStill() && (fluidState.isOf(Fluids.WATER) || fluidState.isOf(Fluids.FLOWING_WATER))) {
+
+                        // 2. Ensure the block directly above it has an open line of sight to the sky
+                        if (mc.world.isSkyVisible(p.up())) {
+
+                            // 3. Distance check: Is this water block closer than the one we already found?
+                            double distSq = p.getSquaredDistance(playerPos);
+                            if (distSq < closestDistSq) {
+                                closestDistSq = distSq;
+                                closestWater = p;
+                            }
+                        }
+                    }
                 }
-            } catch (Throwable ignored) {}
+            }
         }
-        return best;
+
+        // Return the absolute closest valid fishing spot found, or null if empty
+        return closestWater;
     }
 
     /**
@@ -370,7 +439,7 @@ public class FishingTask implements Task {
             // standard movement watchdog will fire constantly. We don't
             // recover those — let the watchdog count them as no-ops.
             case AIM_AND_CAST, WAITING, REELING, SETTLE, EQUIP_ROD -> {
-                return true;
+                return false;
             }
             case DONE -> { return false; }
         }

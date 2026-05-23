@@ -296,6 +296,18 @@ public class VoteManager {
         }
     }
 
+    /** Bypass the vote and start a task directly. Used by /task command for testing. */
+    public void forceStart(VoteOption opt) {
+        phase = Phase.IDLE;
+        tally.clear();
+        voters.clear();
+        activeOptions.clear();
+        var task = opt.taskFactory.get();
+        int dur = computeDuration(task);
+        ChatPilotClient.TASKS.start(task, dur);
+        ChatPilotMod.LOGGER.info("[ChatPilot] Force-started: {}", opt.label);
+    }
+
     private static long clientTick() {
         return com.grammacrackers.chatpilot.event.TickClock.now();
     }

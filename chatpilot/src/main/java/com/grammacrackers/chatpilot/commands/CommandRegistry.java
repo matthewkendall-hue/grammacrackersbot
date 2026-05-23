@@ -1,8 +1,10 @@
 package com.grammacrackers.chatpilot.commands;
 
 import com.grammacrackers.chatpilot.ChatPilotClient;
+import com.grammacrackers.chatpilot.voting.VoteOption;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
@@ -93,6 +95,14 @@ public class CommandRegistry {
 
             // /trash sets/changes/clears the cactus that the bot tosses
             // junk items at after every task. Same UX as /hopper.
+            LiteralArgumentBuilder<FabricClientCommandSource> taskRoot =
+                ClientCommandManager.literal("task")
+                    .executes(ctx -> taskHelp(ctx.getSource()))
+                    .then(ClientCommandManager.argument("slot", StringArgumentType.word())
+                        .executes(ctx -> forceTask(ctx.getSource(),
+                            StringArgumentType.getString(ctx, "slot"))));
+            dispatcher.register(taskRoot);
+
             LiteralArgumentBuilder<FabricClientCommandSource> trashRoot =
                 ClientCommandManager.literal("trash")
                     .executes(ctx -> setCactusFromAimedBlock(ctx.getSource()))
@@ -367,6 +377,42 @@ public class CommandRegistry {
         }
         src.sendFeedback(Text.literal("Trash cactus is at " + posStr(ChatPilotClient.HOME.getCactusPos())));
         return Command.SINGLE_SUCCESS;
+    }
+
+    /* ------------- /task ------------- */
+
+    private static int taskHelp(FabricClientCommandSource src) {
+        src.sendFeedback(Text.literal(
+            "Usage: /task <slot>  —  slots: 1=Mine  2=Fish  3=Explore  4=Flint  5=Sleep  6=Mystery"));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int forceTask(FabricClientCommandSource src, String slot) {
+        VoteOption opt = resolveSlot(slot.toLowerCase().trim());
+        if (opt == null) {
+            src.sendFeedback(Text.literal(
+                "Unknown slot \"" + slot + "\". Try: 1=Mine  2=Fish  3=Explore  4=Flint  5=Sleep  6=Mystery"));
+            return 0;
+        }
+        if (ChatPilotClient.VOTES == null || ChatPilotClient.TASKS == null) {
+            src.sendFeedback(Text.literal("Pilot not initialized yet."));
+            return 0;
+        }
+        ChatPilotClient.VOTES.forceStart(opt);
+        src.sendFeedback(Text.literal("Started: " + opt.icon + " " + opt.label));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static VoteOption resolveSlot(String s) {
+        return switch (s) {
+            case "1", "mine", "mining"   -> VoteOption.defaultOptions().get("1");
+            case "2", "fish", "fishing"  -> VoteOption.defaultOptions().get("2");
+            case "3", "explore"          -> VoteOption.defaultOptions().get("3");
+            case "4", "flint", "farm"    -> VoteOption.defaultOptions().get("4");
+            case "5", "sleep"            -> VoteOption.buildSleep("5");
+            case "6", "mystery"          -> VoteOption.buildMystery("6");
+            default                      -> null;
+        };
     }
 
     private static String posStr(BlockPos p) {

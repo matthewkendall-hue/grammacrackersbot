@@ -7,6 +7,7 @@ import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.mob.HostileEntity;
+import net.minecraft.entity.mob.Monster;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
@@ -105,7 +106,7 @@ public class CombatHandler {
             // status effects) is NOT a reason to enter combat — there's
             // nothing to fight.
             if (player.getAttacker() instanceof LivingEntity attacker
-                && attacker instanceof HostileEntity) {
+                && attacker instanceof Monster) {
                 ticksSinceDamage = 0;
                 target = attacker;
             }
@@ -202,7 +203,7 @@ public class CombatHandler {
         LivingEntity best = null;
         double bestDist = Double.MAX_VALUE;
         for (Entity e : player.getWorld().getOtherEntities(player, area)) {
-            if (e instanceof HostileEntity h && h.isAlive()) {
+            if (e instanceof LivingEntity h && e instanceof Monster && h.isAlive()) {
                 double d = h.squaredDistanceTo(player);
                 if (d < bestDist) { bestDist = d; best = h; }
             }
