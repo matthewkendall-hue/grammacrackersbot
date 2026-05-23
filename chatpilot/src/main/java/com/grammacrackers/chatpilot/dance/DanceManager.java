@@ -40,9 +40,9 @@ public class DanceManager {
     private double accumulatedUsd  = 0.0;
     private double thresholdLastSeen;
 
-    private boolean dancing = false;
-    private long    danceStartTick;
-    private int     danceDurationTicks;
+    private volatile boolean dancing = false;
+    private volatile long    danceStartTick;
+    private volatile int     danceDurationTicks;
     private Perspective savedPerspective;
     private PositionedSoundInstance currentMusic;
 

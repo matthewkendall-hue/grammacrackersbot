@@ -7,6 +7,7 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import com.grammacrackers.chatpilot.chat.OreDemandTracker;
+import net.minecraft.util.math.BlockPos;
 
 /**
  * Mining task. v1.2.0 refocus on emerald, gold, and coal.
@@ -44,11 +45,6 @@ public class MiningTask implements Task {
         STONE_FALLBACK,
         DONE
     }
-
-    private enum Stage { EMERALD, EMERALD_EXPLORE,
-                         GOLD,    GOLD_EXPLORE,
-                         COAL,    COAL_EXPLORE,
-                         STONE_FALLBACK, DONE }
 
     /** Tracks which ore type is "active" so we know when to reset cycle counters. */
     private enum OreType { EMERALD, GOLD, COAL, NONE }

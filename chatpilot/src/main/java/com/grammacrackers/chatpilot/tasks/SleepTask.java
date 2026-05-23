@@ -106,9 +106,6 @@ public class SleepTask implements Task {
                 // sometimes keeps the screen for a few seconds)
                 if (ticksInStage() > SLEEP_TIMEOUT_SECONDS * 20) {
                     ChatPilotMod.LOGGER.info("[ChatPilot] Sleep timer reached, finishing");
-                    if (mc.player.isSleeping()) {
-                        try { mc.player.networkHandler.sendChatCommand(""); } catch (Throwable ignored) {}
-                    }
                     return true;
                 }
             }

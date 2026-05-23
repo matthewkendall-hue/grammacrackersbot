@@ -153,9 +153,14 @@ public class VoteManager {
             winner = "1";
         }
         VoteOption chosen = activeOptions.getOrDefault(winner, options.get(winner));
-        if (chosen == null) chosen = options.get("1"); // last-resort safety net
+        if (chosen == null) chosen = options.get("1");
+        if (chosen == null) {
+            ChatPilotMod.LOGGER.warn("[ChatPilot] No valid task option found, skipping vote");
+            phase = Phase.IDLE;
+            return;
+        }
         ChatPilotMod.LOGGER.info("[ChatPilot] Winner: {} ({} votes of {})",
-            chosen.label, tally.get(winner), getTotalVotes());
+            chosen.label, tally.getOrDefault(winner, 0), getTotalVotes());
 
         var task = chosen.taskFactory.get();
         int dur = computeDuration(task);
